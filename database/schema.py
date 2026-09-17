@@ -35,19 +35,21 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE TABLE IF NOT EXISTS floors (
     id INTEGER PRIMARY KEY,
     run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+    act_number INTEGER,
     floor_number INTEGER NOT NULL,
     node_type TEXT,
     encounter TEXT,
     event TEXT,
     players_json TEXT NOT NULL,
     raw_json TEXT NOT NULL,
-    UNIQUE(run_id, floor_number)
+    UNIQUE(run_id, act_number, floor_number)
 );
 
 CREATE TABLE IF NOT EXISTS choices (
     id INTEGER PRIMARY KEY,
     run_id INTEGER NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     floor_id INTEGER REFERENCES floors(id) ON DELETE SET NULL,
+    act_number INTEGER,
     floor_number INTEGER,
     kind TEXT NOT NULL,
     choice_path TEXT NOT NULL,
@@ -57,7 +59,7 @@ CREATE TABLE IF NOT EXISTS choices (
 
 CREATE INDEX IF NOT EXISTS idx_runs_character_ascension ON runs(character, ascension);
 CREATE INDEX IF NOT EXISTS idx_runs_result ON runs(result);
-CREATE INDEX IF NOT EXISTS idx_floors_run_number ON floors(run_id, floor_number);
+CREATE INDEX IF NOT EXISTS idx_floors_run_number ON floors(run_id, act_number, floor_number);
 CREATE INDEX IF NOT EXISTS idx_choices_run_kind ON choices(run_id, kind);
 """
 
@@ -76,3 +78,9 @@ def initialize_database(database_path: str | Path) -> None:
     """Create all analytics tables if they do not already exist."""
     with connect(database_path) as connection:
         connection.executescript(SCHEMA)
+        floor_columns = {row["name"] for row in connection.execute("PRAGMA table_info(floors)")}
+        if "act_number" not in floor_columns:
+            connection.execute("ALTER TABLE floors ADD COLUMN act_number INTEGER")
+        choice_columns = {row["name"] for row in connection.execute("PRAGMA table_info(choices)")}
+        if "act_number" not in choice_columns:
+            connection.execute("ALTER TABLE choices ADD COLUMN act_number INTEGER")

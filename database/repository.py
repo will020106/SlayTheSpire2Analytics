@@ -84,17 +84,18 @@ def save_parsed_run(
             ),
         )
         run_id = run_cursor.lastrowid
-        floor_ids: dict[int, int] = {}
+        floor_ids: dict[tuple[int | None, int], int] = {}
 
         for floor in parsed["floor_history"]:
             cursor = connection.execute(
                 """
                 INSERT INTO floors (
-                    run_id, floor_number, node_type, encounter, event, players_json, raw_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    run_id, act_number, floor_number, node_type, encounter, event, players_json, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
+                    floor.get("act"),
                     floor["floor"],
                     floor.get("node_type"),
                     floor.get("encounter"),
@@ -103,19 +104,21 @@ def save_parsed_run(
                     _json(floor["raw"]),
                 ),
             )
-            floor_ids[floor["floor"]] = cursor.lastrowid
+            floor_ids[(floor.get("act"), floor["floor"])] = cursor.lastrowid
 
         for choice in parsed["choices"]:
             floor_number = choice.get("floor")
+            act_number = choice.get("act")
             connection.execute(
                 """
                 INSERT INTO choices (
-                    run_id, floor_id, floor_number, kind, choice_path, choice_position, payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    run_id, floor_id, act_number, floor_number, kind, choice_path, choice_position, payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     run_id,
-                    floor_ids.get(floor_number),
+                    floor_ids.get((act_number, floor_number)),
+                    act_number,
                     floor_number,
                     choice["kind"],
                     choice["path"],
